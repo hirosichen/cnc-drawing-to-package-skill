@@ -1,0 +1,100 @@
+# 孔型格式庫（recipe）——核心內建預設值。
+#
+# 結構照廠內師傅慣用的 LiveCAM（影片 02:31~03:11）：
+#   孔型（功能）→ 子型式 → 規格 → 自動展開整條工序鏈
+# 使用者選的是「這是什麼孔」，**不是選刀**；刀具組合由 recipe 帶出來。
+#
+# 覆蓋方式：客戶／本廠 shop.yaml 若有 hole_formats:，以其為準（本檔為 fallback）。
+# 工步的 role 是語意角色，不是刀號——實際刀具由 role + 規格查廠內刀具庫決定。
+
+hole_formats:
+  # ── 鑽孔 ──────────────────────────────────────────────
+  - id: drill-through
+    type: 鑽孔
+    label: 鑽通孔
+    steps: [center, drill, chamfer]
+    note: 最常見；孔口倒角一刀
+
+  - id: drill-through-nochamfer
+    type: 鑽孔
+    label: 鑽通孔・不倒角
+    steps: [center, drill]
+    note: 影片 03:09「或者是你要鑽孔不倒角」
+
+  - id: drill-blind
+    type: 鑽孔
+    label: 正面鑽盲孔
+    steps: [center, drill, chamfer]
+    depth_rule: blind          # 殘餘壁厚下限檢核（知識庫：孔加工深度計算 三節）
+    note: 深度受殘餘壁厚限制（小刀 1.0／大刀 1.5）
+
+  - id: drill-flat
+    type: 鑽孔
+    label: 平底孔
+    steps: [center, drill, flat, chamfer]
+    note: 影片 03:03「還有一些平底孔」；平底以平頭鑽（F 系）或銑削成形
+
+  - id: drill-relief-back
+    type: 鑽孔
+    label: 鑽通孔＋背面逃孔
+    steps: [center, drill, relief, chamfer]
+    note: 影片 08:51；逃孔前必先確定功能面在哪一側（10:28）
+
+  # ── 承托孔（沉頭孔）────────────────────────────────────
+  - id: counterbore
+    type: 承托孔
+    label: 沉頭孔（通孔＋沉頭）
+    steps: [center, drill, cbore-drill, cbore-mill, chamfer]
+    back_steps: [chamfer]
+    note: |
+      影片 03:26~04:08 的 M8R 實例：一次 mark 轉出五支程式——
+      中心鑽／Ø8.7 通孔／Ø14 沉頭／Ø14 沉頭銑／倒角；翻面另出背面倒角。
+
+  # ── 螺絲孔（牙孔）─────────────────────────────────────
+  - id: tap-through
+    type: 螺絲孔
+    label: 攻牙通孔
+    steps: [center, drill, chamfer, tap]
+    depth_rule: tap-through    # 貫穿攻牙＝素材厚＋攻牙表「超過長」（知識庫：TH制程式慣例）
+
+  - id: tap-blind
+    type: 螺絲孔
+    label: 攻牙盲孔
+    steps: [center, drill, chamfer, tap]
+    depth_rule: tap-blind      # 有效牙深＋無效牙＋排屑餘裕＋鑽尖（知識庫：孔加工深度計算 四節）
+    note: 影片 04:22「盲孔有些客戶要求不能破口」；深度鏈四段
+
+  # ── 拼孔（梢孔）───────────────────────────────────────
+  - id: pin-ream
+    type: 拼孔
+    label: 梢孔（預鑽→導正搪→鉸）
+    steps: [center, predrill, bore-guide, chamfer, ream]
+    after_grinding: [ream]     # 鉸孔必須在研磨之後（知識庫：固定銷符號 工序鐵則）
+    note: |
+      影片 05:52~06:56：LiveCAM 原本轉出「9.5 → 9.8 → 倒角 → 鉸刀」，
+      但鉸刀不修位置，所以程式員把第二支手動改成**精搪（BF）導正**。
+      本格式直接把導正搪納入工序鏈——那正是師傅要的結果。
+
+  # ── 導柱孔 ───────────────────────────────────────────
+  - id: guide-post
+    type: 導柱孔
+    label: 導柱孔（HD→粗搪→精搪）
+    steps: [hd-drill, bore-rough, bore-finish]
+    note: 影片 07:32~08:07 的 28 導柱；逐孔徑刀具對照見知識庫〈導柱導套搪孔工法〉
+
+# 工步語意角色 → 用來分類既有程式的工序鏈
+roles:
+  center:      { name: 中心鑽,     match: [中心鑽, 點窩] }
+  drill:       { name: 鑽孔,       cycles: [G81, G73, G83] }
+  predrill:    { name: 預鑽,       match: [預鑽] }
+  hd-drill:    { name: 高速鑽,     match: [高速鑽, HD, U鑽, 捨棄式] }
+  flat:        { name: 平底,       match: [平底, 平頭] }
+  cbore-drill: { name: 沉頭鑽,     match: [沉頭] }
+  cbore-mill:  { name: 沉頭銑,     match: [沉頭銑, 螺旋] }
+  relief:      { name: 逃孔,       match: [逃孔] }
+  chamfer:     { name: 倒角,       match: [倒角, CC] }
+  tap:         { name: 攻牙,       cycles: [G84, G74] }
+  ream:        { name: 鉸孔,       cycles: [G85, G86, G89], match: [鉸] }
+  bore-guide:  { name: 導正搪,     match: [精搪, BF, 導正] }
+  bore-rough:  { name: 粗搪,       match: [粗搪, BR] }
+  bore-finish: { name: 精搪,       match: [精搪, BF] }

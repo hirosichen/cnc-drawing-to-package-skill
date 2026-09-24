@@ -1,0 +1,34 @@
+# 通用保守預設 — 找不到客戶 shop.yaml 時的保底值。
+# 本檔不得含任何真實客戶資料（skill 會交付給不同客戶）。
+schema: 1
+name: （未設定廠區——建議先做新客戶問答建檔）
+machines:
+  default:
+    controller: fanuc-0i-mf   # 台灣廠最常見；三菱/Siemens 待有實機需求再加模板
+    axes: 3
+    max_rpm: null             # null=不限速；有齒輪箱變速等限制的廠務必設定
+    travel: {x: 1000, y: 500, z: 500}   # 保守值；超行程 verify 會 FAIL，開案請確認
+    rigid_tap: true
+tool_library:
+  path: null                  # null=無廠內 .TAB 刀具庫 → S/F 走慣例估值＋ASSUMED
+  restrict_to_library: false
+  material_map: {}
+  tools: []                   # app 內登錄的廠內刀具（T號/規格）；空=無登錄
+fixtures:
+  default: null               # null=無夾具庫 → 虎鉗假設＋ASSUMED
+  items: {}
+workholding:
+  origin_strategies: [corner-front-left, stock-center, edge-center]
+  default_origin: corner-front-left
+  leveling: 每工序裝夾後校水平；翻面/立夾必重校
+process:
+  rough_finish_split: true
+  rough_wall_allowance: 0.2
+  grind_allowance_per_face: 0.15
+  tight_tol_hole: second-op   # 色標/緊公差孔：預留 → 精鉸/精搪
+input:
+  drawing_preference: [dwg, dxf, pdf, photo]
+confidentiality:
+  nda: false
+  anonymize: false
+examples: []

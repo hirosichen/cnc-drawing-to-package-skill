@@ -1,0 +1,197 @@
+<title>E01 CNC 切削模擬 — O0010 OP10</title>
+<style>
+  /* 單一深色主題：CAM 驗證畫面／機台 HMI 慣例，刻意不做淺色版 */
+  :root{
+    --bg:#101519; --panel:#161d24; --panel2:#1b232c; --line:#26313d;
+    --text:#d7dee7; --dim:#8b98a5; --accent:#46c8b2; --rapid:#e05656;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text); overflow:hidden;
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif;
+  }
+  #app{display:flex; flex-direction:column; height:100vh}
+
+  header{
+    display:flex; align-items:center; gap:16px; padding:8px 16px;
+    background:var(--panel); border-bottom:1px solid var(--line); flex:none;
+  }
+  header h1{font-size:15px; font-weight:600; margin:0; letter-spacing:.02em}
+  header .sub{color:var(--dim); font-size:12px}
+  #setups{display:flex; gap:6px; margin-left:6px}
+  .stab{
+    background:var(--panel2); border:1px solid var(--line); border-radius:4px;
+    padding:4px 10px; font-size:12px; color:var(--dim); cursor:pointer; white-space:nowrap;
+  }
+  .stab:hover{border-color:var(--accent); color:var(--text)}
+  .stab.cur{background:var(--accent); color:#08221d; border-color:transparent; font-weight:600}
+  .stab.done{color:var(--text)}
+  .stab.done::before{content:'✓ '; color:var(--accent)}
+  .stab.cur.done::before{content:''}
+  #clampmsg{
+    position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);
+    background:rgba(16,21,25,.92); border:1px solid var(--accent); border-radius:6px;
+    padding:14px 26px; font-size:16px; font-weight:600; color:var(--text);
+    display:none; pointer-events:none; text-align:center;
+  }
+  #clampmsg small{display:block; font-weight:400; font-size:12px; color:var(--dim); margin-top:4px}
+  #toolchip{
+    margin-left:auto; display:flex; align-items:center; gap:8px;
+    background:var(--panel2); border:1px solid var(--line); border-radius:4px;
+    padding:4px 10px; font-family:var(--mono); font-size:12px; white-space:nowrap;
+  }
+  #toolswatch{width:10px;height:10px;border-radius:2px;background:#666;flex:none}
+
+  main{display:flex; flex:1; min-height:0}
+  #viewport{position:relative; flex:1; min-width:0}
+  #viewport canvas{display:block}
+
+  #dro{
+    position:absolute; left:12px; bottom:12px; padding:8px 12px;
+    background:rgba(16,21,25,.82); border:1px solid var(--line); border-radius:4px;
+    font-family:var(--mono); font-size:13px; font-variant-numeric:tabular-nums;
+    pointer-events:none; min-width:150px;
+  }
+  #dro .ax{display:flex; justify-content:space-between; gap:14px}
+  #dro .ax b{color:var(--accent); font-weight:600}
+  #dro .frow{color:var(--dim); font-size:11px; margin-top:4px; border-top:1px solid var(--line); padding-top:4px}
+
+  #opname{
+    position:absolute; left:12px; top:12px; max-width:60%;
+    background:rgba(16,21,25,.82); border:1px solid var(--line); border-radius:4px;
+    padding:5px 12px; font-size:12px; color:var(--text); pointer-events:none;
+  }
+  #opname b{color:var(--accent)}
+
+  #legend{
+    position:absolute; right:12px; top:12px; display:flex; flex-direction:column; gap:3px;
+    background:rgba(16,21,25,.82); border:1px solid var(--line); border-radius:4px;
+    padding:8px 10px; font-size:11px; pointer-events:none;
+  }
+  #legend .li{display:flex; align-items:center; gap:6px; color:var(--dim)}
+  #legend .li i{width:9px;height:9px;border-radius:2px;flex:none}
+  #legend .li.on{color:var(--text)}
+
+  aside{
+    width:330px; flex:none; display:flex; flex-direction:column;
+    background:var(--panel); border-left:1px solid var(--line); min-height:0;
+  }
+  aside h2{
+    margin:0; padding:8px 14px 6px; font-size:11px; font-weight:600; color:var(--dim);
+    letter-spacing:.12em; text-transform:uppercase; flex:none;
+  }
+  #oplist{flex:none; max-height:38%; overflow-y:auto; padding:0 8px 8px}
+  #oplist .op{
+    display:flex; gap:8px; align-items:baseline; padding:4px 8px; border-radius:4px;
+    cursor:pointer; font-size:12.5px; color:var(--dim);
+  }
+  #oplist .op:hover{background:var(--panel2); color:var(--text)}
+  #oplist .op.cur{background:var(--panel2); color:var(--text)}
+  #oplist .op.done{color:var(--text)}
+  #oplist .op .tno{font-family:var(--mono); font-size:11px; flex:none; width:26px; color:inherit}
+  #oplist .op .dot{width:8px;height:8px;border-radius:2px;flex:none;background:#555;position:relative;top:-1px}
+  #oplist .ophead{
+    margin:8px 4px 2px; padding:3px 8px; font-size:11px; font-weight:600; color:var(--accent);
+    border-top:1px solid var(--line); cursor:pointer; letter-spacing:.05em;
+  }
+  #oplist .ophead:first-child{margin-top:2px; border-top:none}
+  #oplist .ophead:hover{color:var(--text)}
+
+  #gcodewrap{flex:1; min-height:0; border-top:1px solid var(--line); display:flex; flex-direction:column}
+  #gcode{
+    flex:1; overflow:auto; font-family:var(--mono); font-size:11.5px; line-height:1.45;
+    padding:6px 0; white-space:pre; color:var(--dim); font-variant-numeric:tabular-nums;
+  }
+  #gcode .gl{padding:0 14px 0 10px; border-left:3px solid transparent}
+  #gcode .gl.cur{background:var(--panel2); color:var(--text); border-left-color:var(--accent)}
+  #gcode .gl .ln{display:inline-block; width:34px; color:#4a5663; text-align:right; margin-right:10px; user-select:none}
+  #gcode .gl.cmt{color:#5f8a72}
+
+  footer{
+    flex:none; display:flex; align-items:center; gap:14px; padding:10px 16px;
+    background:var(--panel); border-top:1px solid var(--line);
+  }
+  button{
+    background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    border-radius:4px; padding:6px 14px; font-size:13px; cursor:pointer; font-family:inherit;
+  }
+  button:hover{border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent); outline-offset:1px}
+  #btnPlay{min-width:84px; background:var(--accent); color:#08221d; border-color:transparent; font-weight:600}
+  #btnPlay:hover{filter:brightness(1.1)}
+  .spd{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--dim); white-space:nowrap}
+  .spd output{font-family:var(--mono); color:var(--text); min-width:52px; display:inline-block; font-variant-numeric:tabular-nums}
+  input[type=range]{accent-color:var(--accent); width:130px}
+  #progwrap{flex:1; display:flex; align-items:center; gap:10px; min-width:120px}
+  #progbar{
+    flex:1; height:14px; background:var(--panel2); border:1px solid var(--line);
+    border-radius:7px; cursor:pointer; position:relative; overflow:hidden;
+  }
+  #progfill{position:absolute; inset:0 auto 0 0; width:0%; background:linear-gradient(90deg,#2b8071,var(--accent)); border-radius:7px}
+  #timedisp{font-family:var(--mono); font-size:12px; color:var(--dim); white-space:nowrap; font-variant-numeric:tabular-nums}
+  label.tg{display:flex; align-items:center; gap:5px; font-size:12px; color:var(--dim); cursor:pointer; white-space:nowrap}
+
+  @media (max-width:900px){
+    aside{display:none}
+    footer{flex-wrap:wrap; gap:8px}
+  }
+
+  /* ---- 手機補丁（portal 注入,2026-07-16）：窄幅下 header 緊湊、控制列永遠可見 ---- */
+  @supports (height:100dvh){ #app{height:100dvh} }
+  #viewport{overflow:hidden}
+  @media (max-width:760px){
+    header{flex-wrap:wrap; gap:4px 10px; padding:6px 10px}
+    header h1{font-size:13px; line-height:1.35; width:100%; white-space:normal}
+    header .sub{display:none}
+    #setups{flex-wrap:wrap; margin-left:0}
+    #toolchip{margin-left:auto; max-width:58%}
+    #toolchip span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+    #opname{max-width:55%; font-size:11px}
+    #legend{max-width:44%; font-size:10px; padding:6px 8px}
+    #dro{font-size:11px; min-width:120px; padding:6px 9px}
+    footer{flex-wrap:wrap; gap:8px 10px; padding:8px 10px}
+    footer button{padding:8px 12px; font-size:13px}
+    #btnPlay{min-width:96px}
+    .spd input[type=range]{width:76px}
+    #progwrap{flex-basis:100%; order:6; min-width:0}
+  }
+</style>
+
+<div id="app">
+  <header>
+    <h1>E01 PDS3 滑座底板 — CNC 切削模擬</h1>
+    <div id="setups"></div>
+    <span class="sub" id="setupsub">FANUC 0i-MF · 素材 288×100×28（六面研磨完成）</span>
+    <div id="toolchip"><i id="toolswatch"></i><span id="toolinfo">待機 — 按「開始加工」</span></div>
+  </header>
+  <main>
+    <div id="viewport">
+      <div id="opname">工序：<b id="opnametext">尚未開始</b></div>
+      <div id="dro">
+        <div class="ax"><b>X</b><span id="drox">0.000</span></div>
+        <div class="ax"><b>Y</b><span id="droy">0.000</span></div>
+        <div class="ax"><b>Z</b><span id="droz">50.000</span></div>
+        <div class="frow"><span id="drof">F —</span> · <span id="droln">N—</span></div>
+      </div>
+      <div id="legend"></div>
+      <div id="clampmsg"></div>
+    </div>
+    <aside>
+      <h2>工序清單（點選跳轉）</h2>
+      <div id="oplist"></div>
+      <div id="gcodewrap">
+        <h2 id="gtitle">G-code — O0010_OP10_TOP.nc</h2>
+        <div id="gcode"></div>
+      </div>
+    </aside>
+  </main>
+  <footer>
+    <button id="btnPlay">▶ 開始加工</button>
+    <button id="btnReset">↺ 重置素材</button>
+    <div class="spd">倍速 <input type="range" id="speed" min="0" max="100" value="62"><output id="speedout">×60</output></div>
+    <div id="progwrap"><div id="progbar"><div id="progfill"></div></div><span id="timedisp">0:00 / 0:00</span></div>
+    <label class="tg"><input type="checkbox" id="tgPath" checked> 顯示刀路</label>
+  </footer>
+</div>

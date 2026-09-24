@@ -1,0 +1,56 @@
+# 全虛構示範檔 — 欄位教學用，複製到「客戶專案根目錄/shop.yaml」再改成實際值。
+# 客戶檔只需寫「與 default.yaml 不同」的鍵，loader 會深合併。
+schema: 1
+name: 範例精機股份有限公司（虛構）
+machines:
+  default:
+    controller: fanuc-0i-mf       # 程式開頭/結尾模板；FANUC 系適用 0i-MF 慣例
+    axes: 3
+    max_rpm: 6000                 # 齒輪箱變速機上限範例；直軸機可設 null 或 10000
+    travel: {x: 1350, y: 700, z: 550}
+    rigid_tap: true
+tool_library:
+  path: /path/to/廠內刀具庫資料     # zip 內含 Big5 .TAB 固定欄寬表（見 SKILL.md 刀具庫節）
+  restrict_to_library: true       # true=只可用庫內刀（tools ∪ .TAB），庫外刀=需採購並三處醒目標示
+  tools:                          # app 內登錄的廠內刀具——T 號/規格以此為準，S/F 仍查 .TAB 表
+    - {t: 1, type: 端銑刀, dia: 10, flute_len: 25, len: 80, max_rpm: null, note: 四刃}
+    - {t: 2, type: 鑽尾, dia: 8.5, flute_len: 60, len: 100, max_rpm: null, note: ''}
+    - {t: 3, type: 攻牙, dia: 6, flute_len: 20, len: 90, max_rpm: 800, note: M6×1.0}
+  material_map:                   # 圖面材質 → 切削表；assumed:true 會列入回確清單
+    S50C: SS41
+    SPHC: SS41
+    SKD11: SKD11
+    DC53: SKD11
+    PDS3: {table: SKD11, assumed: true}
+fixtures:
+  default: vise-6                 # 未指定時優先選用的夾具
+  items:
+    vise-6:
+      type: vise                  # vise|magnet|vacuum|plate|chuck|custom
+      clamp_height: 40            # 夾持面高度 mm——安全高度/下刀避讓檢核
+      max_opening: 160            # 最大開口——工件寬超過要換夾或列回確
+      jaw_width: 150
+      note: 精密平口鉗（虛構示範）
+    magnet-450:
+      type: magnet
+      clamp_height: 55
+      max_opening: 450
+      jaw_width: 450
+      note: 磁盤——薄件研磨前後用（虛構示範）
+workholding:
+  origin_strategies: [corner-front-left, stock-center, edge-center]
+  default_origin: stock-center    # 這家習慣外框分中
+  leveling: 首件校正水平±0.01/300mm；翻面必重校，立夾加百分表打表
+process:
+  rough_finish_split: true
+  rough_wall_allowance: 0.2
+  grind_allowance_per_face: 0.15
+  tight_tol_hole: second-op
+input:
+  drawing_preference: [dwg, dxf, pdf, photo]
+confidentiality:
+  nda: true
+  anonymize: true                 # 檔名/報告以件號代客戶名稱
+examples:
+  - /path/to/已完成案例A          # 同客戶開案先查：同圖已判讀過就沿用，不重新猜圖
+notes: 週五 16:00 後不排新機台試切（虛構備註示範）
